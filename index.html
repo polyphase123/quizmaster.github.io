@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ridiculous Energy Project Quiz</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            font-family: 'Poppins', sans-serif;
+        }
+        #bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+        .quiz-card {
+            background-color: rgba(17, 24, 39, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(99, 102, 241, 0.7);
+            box-shadow: 0 0 30px rgba(76, 29, 149, 0.6);
+        }
+        .choice-btn {
+            transition: all 0.2s ease-in-out;
+            border: 1px solid #4f46e5;
+            color: #c7d2fe;
+            background-color: rgba(79, 70, 229, 0.1);
+        }
+        .choice-btn:hover:not(:disabled) {
+            transform: translateY(-3px);
+            background-color: #4f46e5;
+            color: #ffffff;
+            box-shadow: 0 0 15px rgba(79, 70, 229, 0.8);
+        }
+        .choice-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+        .glow-text {
+            text-shadow: 0 0 8px rgba(165, 180, 252, 0.8);
+        }
+        .btn-primary {
+            background-image: linear-gradient(to right, #4338ca, #6d28d9);
+            box-shadow: 0 0 15px rgba(99, 102, 241, 0.5), 0 0 25px rgba(99, 102, 241, 0.3);
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover {
+            box-shadow: 0 0 25px rgba(99, 102, 241, 0.8), 0 0 40px rgba(99, 102, 241, 0.5);
+        }
+        .timer-bar {
+            transition-property: width;
+            transition-timing-function: linear;
+            background-image: linear-gradient(to right, #4f46e5, #a5b4fc);
+            box-shadow: 0 0 10px #6366f1;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+
+        .dino {
+            position: fixed;
+            width: 4px; height: 4px;
+            z-index: 100; will-change: transform;
+            background-color: #9333ea; /* Purple */
+            box-shadow: 
+                /* Head */
+                0 -4px 0 #9333ea, 4px -4px 0 #9333ea, 8px -4px 0 #9333ea,
+                -4px 0 0 #9333ea, 4px 0 0 #9333ea, 8px 0 0 #9333ea,
+                /* Eye */
+                4px -4px 0 #fff,
+                /* Body */
+                -8px 4px 0 #9333ea, -4px 4px 0 #9333ea, 0 4px 0 #9333ea, 4px 4px 0 #9333ea,
+                -12px 8px 0 #9333ea, -8px 8px 0 #9333ea, -4px 8px 0 #9333ea, 0 8px 0 #9333ea,
+                /* Tail */
+                -16px 4px 0 #9333ea, -20px 0 0 #9333ea,
+                /* Legs */
+                -8px 12px 0 #9333ea, 0 12px 0 #9333ea;
+        }
+        @keyframes runAcross {
+            from { transform: translateX(-50px) scaleX(-1); } /* Start flipped */
+            to { transform: translateX(100vw) scaleX(-1); } /* End flipped */
+        }
+        .run-animation { animation: runAcross 4s linear; }
+
+        .lifeline-btn {
+            background-color: rgba(55, 48, 163, 0.5);
+            border: 1px solid #4f46e5;
+            transition: all 0.2s ease-in-out;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .lifeline-btn:hover:not(:disabled) {
+            background-color: #4f46e5;
+            box-shadow: 0 0 10px #818cf8;
+        }
+        .lifeline-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            background-color: rgba(30, 41, 59, 0.5);
+        }
+        .achievement-badge {
+            background-color: #1e293b;
+            border: 1px solid #4a5568;
+            padding: 8px 16px;
+            border-radius: 9999px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.875rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200 flex items-center justify-center min-h-screen p-4">
+
+    <canvas id="bg-canvas"></canvas>
+    <div id="distraction-container"></div>
+
+    <div id="quiz-container" class="w-full max-w-2xl mx-auto text-center">
+        <h1 class="text-2xl sm:text-3xl md:text-4xl font-bold text-indigo-300 mb-6 glow-text">Ridiculous Energy Project Quiz</h1>
+        
+        <div id="start-screen" class="quiz-card p-6 sm:p-8 rounded-2xl fade-in">
+            <p class="text-gray-300 mb-8">Test your knowledge of the Philippine energy sector. You have a few seconds per question. Good luck!</p>
+            <button id="start-btn" class="w-full md:w-auto text-white font-bold py-3 px-8 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 transform hover:scale-105 btn-primary">
+                Start Quiz
+            </button>
+        </div>
+
+        <div id="quiz-screen" class="hidden quiz-card p-4 sm:p-6 md:p-8 rounded-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <div class="text-sm text-gray-400">Question <span id="question-number"></span> of <span id="total-questions"></span></div>
+                <div class="text-lg font-mono font-semibold text-indigo-300">Time: <span id="timer-display"></span>s</div>
+            </div>
+            
+            <div class="w-full bg-gray-700 rounded-full h-2.5 mb-6">
+                <div id="timer-bar" class="h-2.5 rounded-full" style="width: 100%"></div>
+            </div>
+
+            <h2 id="question-text" class="text-lg sm:text-xl md:text-2xl font-semibold mb-6 min-h-[100px] glow-text text-indigo-200"></h2>
+            
+            <div id="choices-container" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+
+            <div id="lifelines-container" class="mt-6 pt-4 border-t border-gray-700 flex justify-center gap-4">
+                <button id="lifeline-5050" class="lifeline-btn rounded-full" title="50/50 - Remove two wrong answers">
+                    <span class="font-bold text-lg">50/50</span>
+                </button>
+                <button id="lifeline-time" class="lifeline-btn rounded-full" title="Add 3 seconds">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <span class="font-bold text-sm ml-1">+3s</span>
+                </button>
+                <button id="lifeline-skip" class="lifeline-btn rounded-full" title="Skip question">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"></path></svg>
+                </button>
+            </div>
+        </div>
+
+        <div id="results-screen" class="hidden quiz-card p-6 sm:p-8 rounded-2xl">
+            <p class="text-lg mb-2">Final Score:</p>
+            <p id="score-text" class="text-4xl sm:text-5xl font-bold text-indigo-300 mb-2"></p>
+            <p id="score-breakdown" class="text-gray-400 mb-4"></p>
+            <p class="text-sm text-gray-500 mb-4">Remember: This quiz is scored right minus wrong!</p>
+            <p class="text-xl font-semibold mb-2 glow-text">Your Evolutionary Rating:</p>
+            <p id="rating-text" class="text-2xl font-bold text-indigo-200 mb-6"></p>
+            
+            <div id="achievements-unlocked" class="mb-6 min-h-[50px]"></div>
+
+            <!-- Score Legend -->
+            <div class="mt-4 pt-4 border-t border-gray-700 text-xs text-gray-400 text-left">
+                <h4 class="font-bold text-sm text-center mb-2">Score Legend</h4>
+                <ul class="max-w-xs mx-auto space-y-1">
+                    <li class="flex justify-between"><span>Score of 10:</span> <strong>Homo sapiens</strong></li>
+                    <li class="flex justify-between"><span>Score 7 to 9:</span> <strong>Homo erectus</strong></li>
+                    <li class="flex justify-between"><span>Score 3 to 6:</span> <strong>Homo habilis</strong></li>
+                    <li class="flex justify-between"><span>Score 0 to 2:</span> <strong>Australopithecus</strong></li>
+                    <li class="flex justify-between"><span>Score below 0:</span> <strong>Proconsul</strong></li>
+                </ul>
+            </div>
+
+            <div class="flex justify-center mt-6">
+                <button id="play-again-btn" class="w-full md:w-auto text-white font-bold py-3 px-8 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 transform hover:scale-105 btn-primary">
+                    Play Again
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Starfield Background ---
+        const canvas = document.getElementById('bg-canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        let stars = [];
+        const numStars = 200;
+        function createStars() { stars = []; for (let i = 0; i < numStars; i++) { stars.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, radius: Math.random() * 1.5 + 0.5, vx: Math.random() * 0.2 - 0.1, vy: Math.random() * 0.2 - 0.1, alpha: Math.random() * 0.5 + 0.5 }); } }
+        function drawStars() { ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.fillStyle = '#0a0a23'; ctx.fillRect(0, 0, canvas.width, canvas.height); stars.forEach(star => { ctx.beginPath(); ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2); ctx.fillStyle = `rgba(255, 255, 255, ${star.alpha})`; ctx.fill(); star.x += star.vx; star.y += star.vy; if (star.x < 0 || star.x > canvas.width) star.vx = -star.vx; if (star.y < 0 || star.y > canvas.height) star.vy = -star.vy; }); requestAnimationFrame(drawStars); }
+        window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; createStars(); });
+        createStars();
+        drawStars();
+
+        // --- Sound Synthesis & Distractions ---
+        let synth;
+        const distractionContainer = document.getElementById('distraction-container');
+        function setupSound() { if (Tone.context.state !== 'running') { Tone.start(); } synth = new Tone.Synth({ oscillator: { type: 'sawtooth' }, envelope: { attack: 0.01, decay: 0.1, sustain: 0.2, release: 0.2 } }).toDestination(); }
+        function playStartSound() { if (!synth) setupSound(); const now = Tone.now(); synth.triggerAttackRelease('C4', '8n', now); synth.triggerAttackRelease('E4', '8n', now + 0.2); synth.triggerAttackRelease('G4', '8n', now + 0.4); synth.triggerAttackRelease('C5', '4n', now + 0.6); }
+        function playRandomSound() { if (!synth) return; const notes = ['C3', 'E3', 'G3', 'A4', 'C5', 'D2']; const randomNote = notes[Math.floor(Math.random() * notes.length)]; synth.triggerAttackRelease(randomNote, '16n'); }
+        function createDinosaur() { const dino = document.createElement('div'); dino.className = 'dino run-animation'; dino.style.top = `${Math.random() * 80 + 10}%`; distractionContainer.appendChild(dino); setTimeout(() => { dino.remove(); }, 4000); }
+
+        // --- Quiz Elements ---
+        const startScreen = document.getElementById('start-screen');
+        const quizScreen = document.getElementById('quiz-screen');
+        const resultsScreen = document.getElementById('results-screen');
+        const startBtn = document.getElementById('start-btn');
+        const playAgainBtn = document.getElementById('play-again-btn');
+        const questionNumberEl = document.getElementById('question-number');
+        const totalQuestionsEl = document.getElementById('total-questions');
+        const timerDisplayEl = document.getElementById('timer-display');
+        const timerBarEl = document.getElementById('timer-bar');
+        const questionTextEl = document.getElementById('question-text');
+        const choicesContainerEl = document.getElementById('choices-container');
+        const scoreTextEl = document.getElementById('score-text');
+        const scoreBreakdownEl = document.getElementById('score-breakdown');
+        const ratingTextEl = document.getElementById('rating-text');
+        const achievementsUnlockedEl = document.getElementById('achievements-unlocked');
+        
+        // --- Lifeline Elements ---
+        const lifeline5050Btn = document.getElementById('lifeline-5050');
+        const lifelineTimeBtn = document.getElementById('lifeline-time');
+        const lifelineSkipBtn = document.getElementById('lifeline-skip');
+
+        // --- Full Question Database (200 Questions) ---
+        const fullQuizData = [
+            { question: "The Sual Power Station's two units utilize turbines from which company?", choices: ["GEC Alstom", "General Electric", "Mitsubishi Heavy Industries", "Siemens"], correctAnswer: "GEC Alstom" },
+            { question: "Who was the consortium partner responsible for the boiler works for the Sual Power Station?", choices: ["Stein", "Babcock & Wilcox", "Foster Wheeler", "Doosan"], correctAnswer: "Stein" },
+            { question: "According to Wikipedia, what is the stated nameplate capacity of the Sual Power Station?", choices: ["1218 MW", "1200 MW", "1294 MW", "1000 MW"], correctAnswer: "1218 MW" },
+            { question: "What is the precise height of the flue-gas stack at the Sual Power Station?", choices: ["215 m", "210 m", "220 m", "225 m"], correctAnswer: "215 m" },
+            { question: "What advanced boiler technology does Masinloc Power Plant's Unit 3 use?", choices: ["Supercritical Steam Generator Technology", "Subcritical Pulverized Coal", "Circulating Fluidized Bed", "Integrated Gasification Combined Cycle"], correctAnswer: "Supercritical Steam Generator Technology" },
+            { question: "In which year did the original Unit 1 of the Masinloc Power Plant commence operations?", choices: ["1998", "1997", "1999", "2000"], correctAnswer: "1998" },
+            { question: "Which American company was awarded the contract for a supercritical boiler for the Masinloc expansion?", choices: ["Babcock & Wilcox", "General Electric Power", "Combustion Engineering", "Riley Stoker Corporation"], correctAnswer: "Babcock & Wilcox" },
+            { question: "Which South Korea-based firm was the lead contractor for the Masinloc expansion project?", choices: ["POSCO Engineering and Construction Co. Ltd.", "Hyundai Engineering & Construction", "Samsung C&T Corporation", "Daewoo E&C"], correctAnswer: "POSCO Engineering and Construction Co. Ltd." },
+            { question: "In what year were the original two units of the Pagbilao Power Plant commissioned?", choices: ["1996", "1995", "1997", "1998"], correctAnswer: "1996" },
+            { question: "In what year did the 420 MW third unit at the Pagbilao facility begin operations?", choices: ["2018", "2017", "2019", "2016"], correctAnswer: "2018" },
+            { question: "What is the height of the flue gas stack at the Pagbilao Power Plant according to TeaM Energy?", choices: ["220 meters", "210 meters", "215 meters", "225 meters"], correctAnswer: "220 meters" },
+            { question: "What was the proposed stack height for new units in a proposed expansion at Pagbilao?", choices: ["150 m", "140 m", "160 m", "175 m"], correctAnswer: "150 m" },
+            { question: "When was Unit 1 of the Calaca Power Station commissioned?", choices: ["1984", "1983", "1985", "1986"], correctAnswer: "1984" },
+            { question: "In which year did Unit 2 of the original Calaca Power Station commence operations?", choices: ["1995", "1994", "1996", "1997"], correctAnswer: "1995" },
+            { question: "What is the capacity of the separate power station at the Calaca site operated by SLTEC?", choices: ["270 MW", "250 MW", "300 MW", "335 MW"], correctAnswer: "270 MW" },
+            { question: "What is the specific installed capacity of the Mariveles Coal-Fired Power Plant operated by GNPower?", choices: ["655.0 MW", "650.2 MW", "651.6 MW", "652.4 MW"], correctAnswer: "655.0 MW" },
+            { question: "The SMC Limay Power Plant, which utilizes CFB technology, was commissioned in which year?", choices: ["2017", "2016", "2018", "2019"], correctAnswer: "2017" },
+            { question: "The Ilijan Combined-Cycle Power Plant is equipped with what model of MHI gas turbines?", choices: ["M501G", "M501F", "M701F", "M701G"], correctAnswer: "M501G" },
+            { question: "The two steam turbines at the Ilijan Power Plant are of which Mitsubishi model?", choices: ["TC2F-40", "TC2F-38", "TC4F-40", "TC4F-38"], correctAnswer: "TC2F-40" },
+            { question: "How many axial flow stages does the compressor of the M501G gas turbines at Ilijan have?", choices: ["17", "16", "18", "19"], correctAnswer: "17" },
+            { question: "How many dual-fuel dry low NOx combustors are there per M501G gas turbine at the Ilijan plant?", choices: ["16", "12", "14", "18"], correctAnswer: "16" },
+            { question: "On what date in 2002 did the Ilijan Power Plant officially begin commercial operation?", choices: ["June 5, 2002", "May 6, 2002", "July 4, 2002", "August 3, 2002"], correctAnswer: "June 5, 2002" },
+            { question: "What is the nominal rating per unit of the steam turbine at the Ilijan plant?", choices: ["242 MW", "240 MW", "245 MW", "248 MW"], correctAnswer: "242 MW" },
+            { question: "The Bauang Diesel Power Plant was commissioned on what date?", choices: ["July 25, 1995", "June 25, 1995", "August 25, 1995", "September 25, 1995"], correctAnswer: "July 25, 1995" },
+            { question: "What was the name of the private consortium for the Bauang Diesel Power Plant's BOT agreement?", choices: ["First Private Power Corp. (FPPC)", "Bauang Private Power Corporation", "1590 Energy Corporation", "Vivant Energy Corp."], correctAnswer: "First Private Power Corp. (FPPC)" },
+            { question: "Who was the recipient of the Bauang plant turnover after its BOT agreement expired?", choices: ["1590 Energy Corporation", "The Municipal Government of Bauang", "The Provincial Government of La Union", "Meralco"], correctAnswer: "1590 Energy Corporation" },
+            { question: "The Santa Rita Combined Cycle Power Plant was commissioned in which year?", choices: ["2000", "1996", "1997", "1998"], correctAnswer: "2000" },
+            { question: "When was the 500 MW San Lorenzo Combined Cycle Power Plant commissioned?", choices: ["2002", "2000", "2001", "2003"], correctAnswer: "2002" },
+            { question: "What is the specific installed capacity of the Limay Combined Cycle Gas Turbine Power Plant?", choices: ["620 MW", "600 MW", "610 MW", "640 MW"], correctAnswer: "620 MW" },
+            { question: "The Avion Power Plant was commissioned in 2016 with what specific capacity?", choices: ["97 MW", "95 MW", "99 MW", "101 MW"], correctAnswer: "97 MW" },
+            { question: "The original Ambuklao Hydroelectric Power Plant was equipped with turbines from which manufacturer?", choices: ["General Electric", "Allis-Chalmers", "Westinghouse", "Voith"], correctAnswer: "General Electric" },
+            { question: "Which Chicago-based firm provided the engineering design for the original Ambuklao dam?", choices: ["Harza Engineering Company", "Bechtel Corporation", "Sargent & Lundy", "Stone & Webster"], correctAnswer: "Harza Engineering Company" },
+            { question: "The civil works contractor for the Ambuklao project was Guy F. Atkinson Co., based in which U.S. city?", choices: ["San Francisco, USA", "New York, USA", "Chicago, USA", "Boston, USA"], correctAnswer: "San Francisco, USA" },
+            { question: "Which Norwegian-headquartered firm was the owner's engineer for the Ambuklao and Binga rehabilitation?", choices: ["Norconsult", "Statkraft", "Multiconsult", "Sweco"], correctAnswer: "Norconsult" },
+            { question: "Which contractor was involved in the civil works for the Ambuklao and Binga rehabilitation?", choices: ["McConnell Dowell", "Leighton Contractors", "Downer Group", "Fulton Hogan"], correctAnswer: "McConnell Dowell" },
+            { question: "What is the initial diameter of the six outdoor steel penstocks at the Kalayaan Pumped Storage Power Plant?", choices: ["7.0 m", "5.5 m", "6.0 m", "6.5 m"], correctAnswer: "7.0 m" },
+            { question: "What is the reduced diameter of the penstocks of the Kalayaan I facility closer to the powerhouse?", choices: ["5.7 m", "5.0 m", "5.5 m", "5.8 m"], correctAnswer: "5.7 m" },
+            { question: "Which of the following is NOT one of the commissioning years for the Mak-Ban facility?", choices: ["1992", "1979", "1984", "1996"], correctAnswer: "1992" },
+            { question: "Both the Mak-Ban and Tiwi geothermal plants are operated by which specific entity?", choices: ["AP Renewables Inc.", "Energy Development Corporation", "Philippine Geothermal Production Company, Inc.", "Maibarara Geothermal Inc."], correctAnswer: "AP Renewables Inc." },
+            { question: "What was the depth range of the initial shallow wells drilled at the Tiwi geothermal prospect in the 1960s?", choices: ["420' to 650'", "300' to 550'", "350' to 600'", "400' to 620'"], correctAnswer: "420' to 650'" },
+            { question: "What was the depth of the first successful deep exploratory well at Tiwi, Naglagbong No. 1?", choices: ["5034 ft", "4964 ft", "4984 ft", "5014 ft"], correctAnswer: "5034 ft" },
+            { question: "What is the specified maximum depth pipes must reliably endure in modern rehabilitation projects at the Tiwi steam field?", choices: ["2,800 meters", "2,500 meters", "2,600 meters", "2,700 meters"], correctAnswer: "2,800 meters" },
+            { question: "What was the approximate final construction cost of the Bataan Nuclear Power Plant (BNPP)?", choices: ["US$2.3 billion", "US$1.8 billion", "US$2.1 billion", "US$2.5 billion"], correctAnswer: "US$2.3 billion" },
+            { question: "Which American company supplied the reactor for the Bataan Nuclear Power Plant?", choices: ["Westinghouse Electric", "General Electric", "Babcock & Wilcox", "Combustion Engineering"], correctAnswer: "Westinghouse Electric" },
+            { question: "What was the amount in kickbacks from the BNPP project received by Ferdinand Marcos?", choices: ["US$80 million", "US$70 million", "US$75 million", "US$85 million"], correctAnswer: "US$80 million" },
+            { question: "In August 2023, the damages to be paid by Herminio Disini's estate for his role in the BNPP deal was reduced to what figure?", choices: ["P100 million", "P50 million", "P250 million", "P500 million"], correctAnswer: "P100 million" },
+            { question: "The Burgos Wind Farm in Ilocos Norte, with a capacity of 150 MW, was commissioned in what year?", choices: ["2014", "2013", "2015", "2016"], correctAnswer: "2014" },
+            { question: "The Pililla Wind Farm in Rizal consists of 27 wind turbines of what model?", choices: ["Gamesa G90-1A-2000", "Vestas V90", "Siemens SWT-2.3", "GE 1.5-77"], correctAnswer: "Gamesa G90-1A-2000" },
+            { question: "What is the hub height of the turbines at the Pililla Wind Farm?", choices: ["78 meters", "75 meters", "80 meters", "82 meters"], correctAnswer: "78 meters" },
+            { question: "The Bangui Wind Farm was commissioned in which year?", choices: ["2005", "2004", "2006", "2007"], correctAnswer: "2005" },
+            { question: "The Leyte Geothermal Production Field first began producing steam in which year?", choices: ["1977", "1974", "1975", "1976"], correctAnswer: "1977" },
+            { question: "The Malitbog Geothermal Power Station in Leyte was commissioned in what year?", choices: ["1996", "1995", "1997", "1998"], correctAnswer: "1996" },
+            { question: "In what year were Units 2 and 3 of the Malitbog plant commissioned?", choices: ["1997", "1996", "1998", "1999"], correctAnswer: "1997" },
+            { question: "The Mahanagdong Geothermal Power Station was commissioned in which year?", choices: ["1997", "1996", "1998", "1999"], correctAnswer: "1997" },
+            { question: "When was the Upper Mahiao Geothermal Power Station commissioned?", choices: ["1996", "1995", "1997", "1998"], correctAnswer: "1996" },
+            { question: "The Tongonan I Geothermal Power Plant was commissioned in which year?", choices: ["1983", "1981", "1982", "1984"], correctAnswer: "1983" },
+            { question: "According to the Dec 2024 DOE list, what is the dependable capacity of the Tongonan I GPP?", choices: ["115.4 MW", "112.5 MW", "114.2 MW", "116.8 MW"], correctAnswer: "115.4 MW" },
+            { question: "Which of the following periods is listed as a commissioning phase for the Southern Negros Geothermal Production Field?", choices: ["1993-1994", "1991-1992", "1992-1993", "1996-1997"], correctAnswer: "1993-1994" },
+            { question: "What is the installed capacity of the Palinpinon 2 geothermal plant?", choices: ["80 MW", "75 MW", "85 MW", "90 MW"], correctAnswer: "80 MW" },
+            { question: "The Nasulo Geothermal Power Plant was commissioned in 2015 with what installed capacity?", choices: ["49.4 MW", "48.6 MW", "50.2 MW", "51.1 MW"], correctAnswer: "49.4 MW" },
+            { question: "Based on Dec 2024 DOE data, what is the dependable capacity of the Nasulo GPP?", choices: ["49.1 MW", "47.5 MW", "48.3 MW", "49.4 MW"], correctAnswer: "49.1 MW" },
+            { question: "What is the total dependable capacity of the Unified Leyte Geothermal Power Plant complex?", choices: ["551.4 MW", "548.6 MW", "555.8 MW", "560.2 MW"], correctAnswer: "551.4 MW" },
+            { question: "What is the precise installed capacity of each of the three identical CEDC coal units in Toledo City?", choices: ["82.0 MW", "83.2 MW", "83.7 MW", "84.1 MW"], correctAnswer: "82.0 MW" },
+            { question: "What technology type is used by all three CEDC coal-fired units?", choices: ["Circulating Fluidized Bed (CFB)", "Pulverized Sub Critical", "Supercritical", "Stoker Fired"], correctAnswer: "Circulating Fluidized Bed (CFB)" },
+            { question: "What is the installed capacity of each of the two KSPC coal units in Naga City, Cebu?", choices: ["110.5 MW", "110.0 MW", "111.2 MW", "111.8 MW"], correctAnswer: "110.5 MW" },
+            { question: "What is the installed capacity of Unit 3 of the Panay Energy Development Corporation (PEDC) plant?", choices: ["150.0 MW", "135.0 MW", "145.0 MW", "167.4 MW"], correctAnswer: "150.0 MW" },
+            { question: "What is the dependable capacity of the 135.0 MW Palm Concepcion Power Corporation (PCPC) coal plant?", choices: ["121.5 MW", "120.0 MW", "122.5 MW", "125.0 MW"], correctAnswer: "121.5 MW" },
+            { question: "What is the installed capacity of each of the two units at the Therma Visayas Inc. (TVI) plant?", choices: ["170.0 MW", "165.0 MW", "167.0 MW", "169.0 MW"], correctAnswer: "170.0 MW" },
+            { question: "What is the dependable capacity of the original 23.0 MW Victorias Milling Company (VMC) biomass plant?", choices: ["5.0 MW", "2.5 MW", "7.5 MW", "10.0 MW"], correctAnswer: "5.0 MW" },
+            { question: "The San Carlos BioPower plant has an installed capacity of 20.0 MW. What is its dependable capacity?", choices: ["18.0 MW", "16.0 MW", "17.5 MW", "19.5 MW"], correctAnswer: "18.0 MW" },
+            { question: "What is the dependable capacity of the 46.0 MW URC bagasse-fired plant in Kabankalan?", choices: ["15.0 MW", "20.0 MW", "25.0 MW", "30.0 MW"], correctAnswer: "15.0 MW" },
+            { question: "The North Negros BioPower plant has an installed capacity of 25.0 MW. What is its dependable capacity?", choices: ["22.4 MW", "20.4 MW", "21.2 MW", "23.6 MW"], correctAnswer: "22.4 MW" },
+            { question: "The BISCOM biomass plant has a listed installed capacity of 48.5 MW. What is its dependable capacity?", choices: ["12.3 MW", "10.5 MW", "11.8 MW", "13.1 MW"], correctAnswer: "12.3 MW" },
+            { question: "What is the precise installed capacity of the Helios Solar Power Plant in Cadiz City?", choices: ["132.5 MW", "130.5 MW", "131.5 MW", "133.5 MW"], correctAnswer: "132.5 MW" },
+            { question: "What is the dependable capacity of the 132.5 MW Helios solar plant?", choices: ["106.7 MW", "105.3 MW", "108.1 MW", "109.2 MW"], correctAnswer: "106.7 MW" },
+            { question: "What is the specific installed capacity of the San Carlos Sun Power, Inc. (SACASUN) solar farm?", choices: ["59.0 MW", "55.0 MW", "57.0 MW", "61.0 MW"], correctAnswer: "59.0 MW" },
+            { question: "The First Toledo Solar plant has an installed capacity of 60.0 MW. What is its dependable capacity?", choices: ["49.0 MW", "45.0 MW", "47.0 MW", "51.0 MW"], correctAnswer: "49.0 MW" },
+            { question: "What is the installed and dependable capacity of the San Lorenzo Wind Farm in Guimaras?", choices: ["54.0 MW", "52.0 MW", "56.0 MW", "58.0 MW"], correctAnswer: "54.0 MW" },
+            { question: "The Nabas Wind Farm Phase 1 has an installed capacity of 36.0 MW. What is its dependable capacity?", choices: ["18.0 MW", "19.5 MW", "21.0 MW", "22.5 MW"], correctAnswer: "18.0 MW" },
+            { question: "The Ormoc PH 1&2 Battery Energy Storage System (BESS) has an installed capacity of 47.5 MW. What is its dependable capacity?", choices: ["40.0 MW", "35.0 MW", "37.5 MW", "42.5 MW"], correctAnswer: "40.0 MW" },
+            { question: "The Toledo BESS in Cebu has what specific installed capacity?", choices: ["24.2 MW", "22.5 MW", "23.1 MW", "23.7 MW"], correctAnswer: "24.2 MW" },
+            { question: "What is the installed capacity of Phase 2 of the Kabankalan BESS in Negros Occidental?", choices: ["12.6 MW", "11.8 MW", "12.2 MW", "13.0 MW"], correctAnswer: "12.6 MW" },
+            { question: "Which plant in the Agus Power Plant Complex is located furthest upstream?", choices: ["Agus I", "Agus II", "Agus IV", "Agus VI"], correctAnswer: "Agus I" },
+            { question: "What is the dependable capacity of the 80.5 MW Agus I Hydroelectric Plant?", choices: ["80.0 MW", "65.0 MW", "70.0 MW", "75.0 MW"], correctAnswer: "80.0 MW" },
+            { question: "The Agus II Hydroelectric Plant has an installed capacity of 180.0 MW. What is its dependable capacity?", choices: ["140.0 MW", "110.0 MW", "120.0 MW", "130.0 MW"], correctAnswer: "140.0 MW" },
+            { question: "The Agus IV Hydroelectric Plant has an installed capacity of 158.1 MW. What is its dependable capacity?", choices: ["150.0 MW", "140.0 MW", "145.0 MW", "155.0 MW"], correctAnswer: "150.0 MW" },
+            { question: "What is the installed capacity of the Agus VI Hydroelectric Plant, the largest in the complex?", choices: ["200.0 MW", "215.0 MW", "219.0 MW", "225.0 MW"], correctAnswer: "200.0 MW" },
+            { question: "What is the dependable capacity of the 200.0 MW Agus VI plant?", choices: ["165.0 MW", "160.0 MW", "170.0 MW", "175.0 MW"], correctAnswer: "165.0 MW" },
+            { question: "What is the installed capacity of the Pulangi IV Hydroelectric Plant?", choices: ["255.0 MW", "250.0 MW", "260.0 MW", "265.0 MW"], correctAnswer: "255.0 MW" },
+            { question: "What is the dependable capacity of the Pulangi IV plant?", choices: ["220.0 MW", "215.0 MW", "225.0 MW", "230.0 MW"], correctAnswer: "220.0 MW" },
+            { question: "The construction management contract for Hedcor's Sibulan Hydroelectric project was a joint venture with a firm from which country?", choices: ["New Zealand", "Australia", "Japan", "United Kingdom"], correctAnswer: "New Zealand" },
+            { question: "Who was the electro-mechanical supplier for the Sibulan project?", choices: ["SOCOIN Ingenieria", "Andritz Hydro", "Voith", "General Electric"], correctAnswer: "SOCOIN Ingenieria" },
+            { question: "What is the installed capacity of the downstream Sibulan B Hydro plant?", choices: ["26.0 MW", "25.5 MW", "26.3 MW", "26.8 MW"], correctAnswer: "26.0 MW" },
+            { question: "What is the installed capacity of Unit 2 of the Manolo Fortich hydropower complex?", choices: ["25.4 MW", "26.8 MW", "27.4 MW", "28.1 MW"], correctAnswer: "25.4 MW" },
+            { question: "What is the installed capacity of each of the three CFB units at the FDC Misamis Coal Power Plant?", choices: ["135.0 MW", "130.0 MW", "140.0 MW", "145.0 MW"], correctAnswer: "135.0 MW" },
+            { question: "On what date did Unit 1 of the Therma South Inc. coal plant achieve full commercial operation?", choices: ["September 18, 2015", "August 18, 2015", "October 18, 2015", "November 18, 2015"], correctAnswer: "September 18, 2015" },
+            { question: "What technology type does the GNPower Kauswagan plant use for its four identical units?", choices: ["Pulverized Sub Critical", "Circulating Fluidized Bed (CFB)", "Supercritical", "Ultra-Supercritical"], correctAnswer: "Pulverized Sub Critical" },
+            { question: "What is the installed capacity of each of the four units at the GNPower Kauswagan plant?", choices: ["151.0 MW", "150.0 MW", "152.5 MW", "155.0 MW"], correctAnswer: "151.0 MW" },
+            { question: "What is the installed capacity of Unit 2 of the Sarangani Energy Corporation (SEC) plant?", choices: ["118.5 MW", "117.5 MW", "118.0 MW", "119.0 MW"], correctAnswer: "118.5 MW" },
+            { question: "How many production wells does the Mt. Apo Geothermal Power Plant utilize?", choices: ["18", "17", "19", "20"], correctAnswer: "18" },
+            { question: "How many reinjection wells support the operation of the Mt. Apo Geothermal Power Plant?", choices: ["9", "7", "8", "10"], correctAnswer: "9" },
+            { question: "What is the capacity of Mindanao 2 unit at the Mt. Apo plant?", choices: ["54 MW", "52 MW", "53 MW", "55 MW"], correctAnswer: "54 MW" },
+            { question: "What is the precise flow rate of geothermal brine processed by the bottoming cycle ORC plant at the Mindanao geothermal field?", choices: ["105 kg/s", "100 kg/s", "110 kg/s", "115 kg/s"], correctAnswer: "105 kg/s" },
+            { question: "The WMPC diesel plant in Zamboanga City has an installed capacity of 112.0 MW. What is its dependable capacity?", choices: ["101.7 MW", "100.5 MW", "102.3 MW", "103.1 MW"], correctAnswer: "101.7 MW" },
+            { question: "What is the installed capacity of each of the two TMI power barges in Mindanao?", choices: ["100.0 MW", "90.0 MW", "95.0 MW", "105.0 MW"], correctAnswer: "100.0 MW" },
+            { question: "What is the dependable capacity of each TMI power barge?", choices: ["98.0 MW", "92.0 MW", "94.0 MW", "96.0 MW"], correctAnswer: "98.0 MW" },
+            { question: "The SPPC diesel plant in Alabel, Sarangani, has an installed capacity of 61.7 MW. What is its dependable capacity?", choices: ["55.0 MW", "52.0 MW", "54.0 MW", "56.0 MW"], correctAnswer: "55.0 MW" },
+            { question: "What is the technology type of the 15.0 MW Lamsan Power Corporation biomass plant in Sultan Kudarat?", choices: ["Rice Husk-Fired", "Bagasse-fired Cogeneration Plant", "Multi-feedstock", "Biogas Power Plant"], correctAnswer: "Rice Husk-Fired" },
+            { question: "The Digos Solar Power Plant has an installed capacity of 28.6 MW. What is its dependable capacity?", choices: ["24.2 MW", "23.5 MW", "24.8 MW", "25.1 MW"], correctAnswer: "24.2 MW" },
+            { question: "The Kirahon Solar plant has an installed capacity of 12.5 MW. What is its dependable capacity?", choices: ["10.0 MW", "9.0 MW", "9.5 MW", "10.5 MW"], correctAnswer: "10.0 MW" },
+            { question: "Which company submitted the highest bid for the decommissioned 850 MW Sucat Thermal Power Plant in 2017?", choices: ["Riverbend Consolidated Mining Corporation", "Gagasan Steel Inc.", "VPD Trading", "G.G. Uy Bonapor Metal Contractor Company"], correctAnswer: "Riverbend Consolidated Mining Corporation" },
+            { question: "What was the exact winning bid price for the Sucat Thermal Power Plant assets?", choices: ["PhP305,200,000", "PhP302,500,000", "PhP308,600,000", "PhP310,100,000"], correctAnswer: "PhP305,200,000" },
+            { question: "On what date did the asset turnover for the Sucat plant from PSALM to the winning bidder occur?", choices: ["August 1, 2017", "July 31, 2017", "August 2, 2017", "August 10, 2017"], correctAnswer: "August 1, 2017" },
+            { question: "When were Units 2 and 3 of the Sucat plant decommissioned?", choices: ["January 2002", "January 2001", "January 2003", "January 2004"], correctAnswer: "January 2002" },
+            { question: "Which company was the winning bidder for the Manila Thermal Power Plant (MTPP) sold on April 25, 2008?", choices: ["Gagasan Steel Inc.", "Taifu Metal", "TEC Industries Inc.", "Riverbend Consolidated Mining Corporation"], correctAnswer: "Gagasan Steel Inc." },
+            { question: "What was the winning bid price for the Manila Thermal Power Plant, in its original currency?", choices: ["USD2,506,000", "USD2,605,000", "USD2,706,000", "USD2,805,000"], correctAnswer: "USD2,506,000" },
+            { question: "On what date was Unit 2 of the Manila Thermal Power Plant commissioned?", choices: ["November 1, 1966", "September 15, 1966", "October 1, 1966", "October 15, 1966"], correctAnswer: "November 1, 1966" },
+            { question: "Which company acquired the Cebu Diesel II plant, turned over on May 25, 2009?", choices: ["SPC Power Corporation", "Gagasan Steel Inc.", "Taifu Metal", "TEC Industries Inc."], correctAnswer: "SPC Power Corporation" },
+            { question: "What was the winning bid price for the Cebu Diesel II plant?", choices: ["USD470,000", "USD450,000", "USD460,000", "USD480,000"], correctAnswer: "USD470,000" },
+            { question: "What was the winning bid price for the Aplaya-Gensan decommissioned assets sold on October 2, 2009?", choices: ["USD1,488,000", "USD1,388,000", "USD1,428,000", "USD1,528,000"], correctAnswer: "USD1,488,000" },
+            { question: "What was the target completion quarter for the 2x300MW Coal-Fired Power Plant in Mariveles, proposed by GN Power?", choices: ["4th Quarter of 2012", "2nd Quarter of 2012", "3rd Quarter of 2012", "1st Quarter of 2013"], correctAnswer: "4th Quarter of 2012" },
+            { question: "What was the target month for Unit 2 of the 2x100MW Cebu Coal-Fired Power Plant by KEPCO SPC Power Corporation?", choices: ["May 2011", "April 2011", "June 2011", "July 2011"], correctAnswer: "May 2011" },
+            { question: "What was the planned capacity of the Mindanao 3 Geothermal project by Energy Development Corporation?", choices: ["50 MW", "40 MW", "45 MW", "55 MW"], correctAnswer: "50 MW" },
+            { question: "How much coal capacity is expected to still come online despite the Philippine government's 2020 coal moratorium?", choices: ["2.6 GW", "2.4 GW", "2.5 GW", "2.7 GW"], correctAnswer: "2.6 GW" },
+            { question: "The 232 MW Mindanao coal-fired power plant was scheduled to be retired in 2031, but this was accelerated to what year?", choices: ["2028", "2025", "2026", "2027"], correctAnswer: "2028" },
+            { question: "Which company is the proponent of the 300 MW solar project in Kananga and Ormoc, Leyte?", choices: ["Solar Philippines Visayas Corporation", "San Isidro Solar Power Corporation", "PetroGreen Energy Corporation", "Citicore Solar"], correctAnswer: "Solar Philippines Visayas Corporation" },
+            { question: "In what year are the first three units of San Miguel's 1,750 MW combined cycle power plant in Batangas expected to commence commercial operations?", choices: ["2024", "2023", "2025", "2026"], correctAnswer: "2024" },
+            { question: "In what year was the construction of the Bataan Nuclear Power Plant completed?", choices: ["1984", "1983", "1985", "1986"], correctAnswer: "1984" },
+            { question: "According to Section 38 of R.A. 9136, the Energy Regulatory Commission (ERC) shall be composed of a Chairperson and how many members?", choices: ["Four (4)", "Two (2)", "Three (3)", "Five (5)"], correctAnswer: "Four (4)" },
+            { question: "What is the minimum age for the Chairperson and members of the ERC as specified in Section 38 of EPIRA?", choices: ["Thirty-five (35)", "Thirty (30)", "Forty (40)", "Forty-five (45)"], correctAnswer: "Thirty-five (35)" },
+            { question: "A proposed amendment to Section 38 of EPIRA seeks to change the minimum age requirement for ERC commissioners to what?", choices: ["Forty (40)", "Forty-five (45)", "Fifty (50)", "Fifty-five (55)"], correctAnswer: "Forty (40)" },
+            { question: "Section 38 of EPIRA requires at least one member of the commission to be a member of the Philippine Bar with at least how many years of active practice?", choices: ["Ten (10)", "Five (5)", "Seven (7)", "Fifteen (15)"], correctAnswer: "Ten (10)" },
+            { question: "According to Section 45 of EPIRA, what is the market share cap for a company in a single grid?", choices: ["30%", "25%", "33%", "35%"], correctAnswer: "30%" },
+            { question: "What is the national market share cap for a single entity under Section 45 of EPIRA?", choices: ["25%", "20%", "30%", "35%"], correctAnswer: "25%" },
+            { question: "The definition of a 'related group' under Section 45 of EPIRA includes relatives within what civil degree?", choices: ["Fourth", "Second", "Third", "Fifth"], correctAnswer: "Fourth" },
+            { question: "Section 45 of EPIRA prohibits cross-ownership between generation companies and which other sector?", choices: ["The transmission company", "The generation sector", "The distribution sector", "The supply sector"], correctAnswer: "The transmission company" },
+            { question: "What was the initial period for the 'lifeline rate' for marginalized end-users established by Section 73 of the original EPIRA?", choices: ["10 years", "5 years", "15 years", "20 years"], correctAnswer: "10 years" },
+            { question: "What was the duration of the lifeline rate extension provided by Republic Act No. 10150?", choices: ["10 years", "15 years", "20 years", "25 years"], correctAnswer: "10 years" },
+            { question: "What was the duration of the second extension of the lifeline rate provided by Republic Act No. 11552?", choices: ["30 years", "20 years", "25 years", "40 years"], correctAnswer: "30 years" },
+            { question: "Which body has the exclusive power to grant franchises for electricity transmission and distribution under Section 27 of EPIRA?", choices: ["The Congress of the Philippines", "The Department of Energy (DOE)", "The Energy Regulatory Commission (ERC)", "The Office of the President"], correctAnswer: "The Congress of the Philippines" },
+            { question: "On what date was Republic Act No. 7638, the 'Department of Energy Act of 1992,' approved?", choices: ["December 9, 2024", "December 7, 1992", "December 8, 1992", "December 10, 1992"], correctAnswer: "December 9, 2024" },
+            { question: "What is the specified term of imprisonment for cartelization under R.A. 8479, the 'Downstream Oil Industry Deregulation Act of 1998'?", choices: ["Three (3) years", "Two (2) years", "Four (4) years", "Five (5) years"], correctAnswer: "Three (3) years" },
+            { question: "What term of imprisonment does R.A. 8479 penalize for failure to submit reportorial requirements?", choices: ["One (1) year", "Two (2) years", "Three (3) years", "Four (4) years"], correctAnswer: "One (1) year" },
+            { question: "What is the monetary fine for a first offense of failing to submit mandatory reports under the Energy Efficiency and Conservation Act (R.A. 11285)?", choices: ["Up to 100,000", "Up to 50,000", "Up to 250,000", "Up to 500,000"], correctAnswer: "Up to 100,000" },
+            { question: "What is the maximum monetary fine for a third and subsequent offense under R.A. 11285?", choices: ["1,000,000", "P500,000", "750,000", "1,500,000"], correctAnswer: "1,000,000" },
+            { question: "What is the target for the share of renewable energy in the power generation mix by 2030 under the NREP 2020-2040?", choices: ["35%", "30%", "40%", "45%"], correctAnswer: "35%" },
+            { question: "What is the 2040 target for the share of renewable energy in the power generation mix by the NREP 2020-2040?", choices: ["50%", "40%", "45%", "55%"], correctAnswer: "50%" },
+            { question: "What is the order called that the EMB Director can issue to prevent grave or irreparable environmental damage under Presidential Decree 1586?", choices: ["Cease and Desist Order (CDO)", "Environmental Compliance Order (ECO)", "Notice of Violation (NOV)", "Suspension of Operations Order (SOO)"], correctAnswer: "Cease and Desist Order (CDO)" },
+            { question: "A proposed bill to create a Commission on Nuclear Safety specifies that the Commission shall be composed of a Commissioner and how many Deputy Commissioners?", choices: ["Two", "One", "Three", "Four"], correctAnswer: "Two" },
+            { question: "What was the approximate share of renewable energy in the Philippines' power generation mix in 2021?", choices: ["21%", "19%", "23%", "25%"], correctAnswer: "21%" },
+            { question: "In 2021, what percentage of the Philippines' power generation was attributed to coal?", choices: ["60%", "55%", "62%", "65%"], correctAnswer: "60%" },
+            { question: "In 2021, what was the combined share of geothermal and hydropower in the country's electricity generation?", choices: ["17%", "15%", "19%", "21%"], correctAnswer: "17%" },
+            { question: "According to a 2019 analysis, what was the largest share of total primary energy consumption in the Philippines?", choices: ["Petroleum and other liquids (45%)", "Coal (36%)", "Natural Gas (7%)", "Renewables (11%)"], correctAnswer: "Petroleum and other liquids (45%)" },
+            { question: "What is the estimated contribution of the Malampaya gas field to the country's power needs?", choices: ["Up to 20%", "Up to 10%", "Up to 15%", "Up to 25%"], correctAnswer: "Up to 20%" },
+            { question: "What is the projected peak demand in the Philippines in 2050, according to the PDP 2023-2050?", choices: ["66,783 MW", "65,483 MW", "67,983 MW", "68,483 MW"], correctAnswer: "66,783 MW" },
+            { question: "What percentage of total annual coal production does Semirara Mining and Power Corporation (SMPC) contribute?", choices: ["98%", "95%", "96%", "97%"], correctAnswer: "98%" },
+            { question: "What is the ownership percentage held by PNOC-EC in the Malampaya gas field joint venture?", choices: ["10%", "15%", "20%", "25%"], correctAnswer: "10%" },
+            { question: "As of March 2021, what total capacity had been installed under the Feed-in Tariffs (FIT) System from a target of 1.4 GW?", choices: ["1.2 GW", "1.1 GW", "1.3 GW", "1.4 GW"], correctAnswer: "1.2 GW" },
+            { question: "How much committed renewable energy capacity did the first Green Energy Auction Program (GEAP) auction round in June 2022 generate?", choices: ["1967 MW", "1897 MW", "1927 MW", "1997 MW"], correctAnswer: "1967 MW" },
+            { question: "In 2022, what was the percentage share of renewable energy in the Philippines' electricity generation mix?", choices: ["22%", "19%", "20%", "24%"], correctAnswer: "22%" },
+            { question: "What is Meralco's approximate market share in the fully privatized electricity sector in the Philippines?", choices: ["80%", "60%", "70%", "90%"], correctAnswer: "80%" },
+            { question: "The remaining 20% of the electricity market is served by regional players and how many electric cooperatives?", choices: ["125+", "50+", "75+", "100+"], correctAnswer: "125+" },
+            { question: "What is the process called that all distribution utilities must undergo to secure Power Supply Agreements (PSAs)?", choices: ["Competitive Selection Process (CSP)", "Direct Negotiation Process (DNP)", "Open Bidding Process (OBP)", "Mandated Sourcing Procedure (MSP)"], correctAnswer: "Competitive Selection Process (CSP)" },
+            { question: "What is the system called that the Philippine Renewable Energy Market (REM) uses for trading RE certificates?", choices: ["Philippine Renewable Energy Market System (PREMS)", "Philippine Renewable Certificate System (PRCS)", "National Renewable Trading System (NRTS)", "Green Certificate Market System (GCMS)"], correctAnswer: "Philippine Renewable Energy Market System (PREMS)" },
+            { question: "Besides the offshore Galoc field, where is the other active onshore petroleum field in the Philippines located?", choices: ["Cebu", "Batangas", "Mindoro", "Palawan"], correctAnswer: "Cebu" },
+            { question: "Which of the following represents the correct coordinates for the Sual Power Station?", choices: ["16°06'24\"N 120°5'17\"E", "16°O7'20\"N 120°06'12\"E", "16°07'30\"N 120°06'O2\"E", "16°08'10\"N 120°05'55\"E"], correctAnswer: "16°06'24\"N 120°5'17\"E" },
+            { question: "What technology does the 600 MW Limay Power Plant operated by SMC Consolidated Power Corporation employ?", choices: ["Circulating Fluidized Bed (CFB)", "Subcritical Pulverized Coal", "Supercritical Pulverized Coal", "Gasification"], correctAnswer: "Circulating Fluidized Bed (CFB)" },
+            { question: "What is the specific output capacity of the San Roque Hydroelectric Power Plant?", choices: ["435 MW", "425 MW", "445 MW", "455 MW"], correctAnswer: "435 MW" },
+            { question: "What is the installed capacity of the Magat Hydroelectric Power Plant?", choices: ["380 MW", "350 MW", "360 MW", "370 MW"], correctAnswer: "380 MW" },
+            { question: "By what year was the GE rehabilitation upgrade of the Angat Hydro Electric Power Plant expected to be completed?", choices: ["2023", "2022", "2024", "2025"], correctAnswer: "2023" },
+            { question: "The GE rehabilitation of the Angat plant included the supply of four new 50 MW generators and how many new upgraded auxiliary turbines?", choices: ["Four", "Two", "Three", "Five"], correctAnswer: "Four" },
+            { question: "What was the initial cost estimate from Westinghouse for the Bataan Nuclear Power Plant?", choices: ["US$600 million", "US$500 million", "US$700 million", "US$800 million"], correctAnswer: "US$600 million" },
+            { question: "The Ilijan Power Plant's M501G gas turbines were designed to withstand a turbine inlet temperature of what value?", choices: ["1500°C", "1400°C", "1450°C", "1550°C"], correctAnswer: "1500°C" },
+            { question: "What is the specific oil-fired capacity of the Malaya Thermal Power Plant?", choices: ["650 MW", "620 MW", "640 MW", "660 MW"], correctAnswer: "650 MW" },
+            { question: "Which of the following is NOT one of the listed commissioning years for the Bohol Diesel Power Plant?", choices: ["1992", "1978", "1986", "1996"], correctAnswer: "1992" },
+            { question: "What is the dependable capacity of the 58.3 MW Panay Diesel Power Plant III?", choices: ["52.5 MW", "45.0 MW", "50.0 MW", "55.0 MW"], correctAnswer: "52.5 MW" },
+            { question: "While its installed capacity is 32.0 MW, what is the specific dependable capacity of Power Barge 104?", choices: ["30.0 MW", "28.0 MW", "29.0 MW", "31.0 MW"], correctAnswer: "30.0 MW" },
+            { question: "What is the dependable capacity of the 86.3 MW Isabel Modular Diesel Ancillary Service Power Plant?", choices: ["72.7 MW", "68.7 MW", "70.7 MW", "74.7 MW"], correctAnswer: "72.7 MW" },
+            { question: "What is the specific installed capacity of the Timbaban HEPP run-of-river hydro plant?", choices: ["19.6 MW", "18.5 MW", "18.9 MW", "19.2 MW"], correctAnswer: "19.6 MW" },
+            { question: "The Silay Solar farm has an installed capacity of 25.0 MW. What is its dependable capacity?", choices: ["22.0 MW", "21.0 MW", "21.5 MW", "22.5 MW"], correctAnswer: "22.0 MW" },
+            { question: "What is the dependable capacity of the 11.2 MW Calbayog BCFDPP Oil-Thermal plant?", choices: ["10.6 MW", "10.2 MW", "10.4 MW", "10.8 MW"], correctAnswer: "10.6 MW" },
+            { question: "What is the dependable capacity of the 25.0 MW South Negros BioPower plant?", choices: ["22.4 MW", "21.8 MW", "22.1 MW", "22.9 MW"], correctAnswer: "22.4 MW" },
+            { question: "The Montesol solar plant has an installed capacity of 18.0 MW. What is its dependable capacity?", choices: ["14.4 MW", "14.0 MW", "14.8 MW", "15.2 MW"], correctAnswer: "14.4 MW" },
+            { question: "What is the installed capacity of Talomo 3 hydropower system near Davao City?", choices: ["1.92 MW", "1.62 MW", "1.84 MW", "2.05 MW"], correctAnswer: "1.92 MW" },
+            { question: "What is the dependable capacity of each of the two 116.0 MW units of the Mindanao Coal plant?", choices: ["105.0 MW", "100.0 MW", "110.0 MW", "112.0 MW"], correctAnswer: "105.0 MW" },
+            { question: "What is the installed capacity of each of the three CFB units at the MPC Balingasag Power Station?", choices: ["55.0 MW", "50.0 MW", "60.0 MW", "65.0 MW"], correctAnswer: "55.0 MW" },
+            { question: "What is the dependable capacity of each of the two 150.0 MW units of the MPI coal plant?", choices: ["135.0 MW", "130.0 MW", "140.0 MW", "145.0 MW"], correctAnswer: "135.0 MW" },
+            { question: "The Philippine Sinter Corporation (PSC) operates a power plant using what specific technology?", choices: ["Waste Heat Recovery System", "Bunker/Diesel Internal Combustion Engine", "Bagasse-fired Cogeneration", "Gas Engine"], correctAnswer: "Waste Heat Recovery System" },
+            { question: "What is the installed and dependable capacity of the TMI Hybrid Diesel-Battery System?", choices: ["49.0 MW", "45.0 MW", "47.0 MW", "51.0 MW"], correctAnswer: "49.0 MW" },
+            { question: "The Malita BESS in Davao Occidental has a specific installed capacity. What is this capacity?", choices: ["22.5 MW", "22.2 MW", "22.8 MW", "23.1 MW"], correctAnswer: "22.5 MW" },
+            { question: "The Mindanao 3 (M3) Binary Geothermal Plant has what specific installed capacity?", choices: ["3.4 MW", "3.1 MW", "3.7 MW", "4.0 MW"], correctAnswer: "3.4 MW" },
+            { question: "The Kibawe Ground Mounted solar plant has an installed capacity of 10.5 MW. What is its dependable capacity?", choices: ["8.6 MW", "7.8 MW", "8.2 MW", "9.0 MW"], correctAnswer: "8.6 MW" },
+            { question: "The Agus V Hydroelectric Plant has an installed capacity of 55.0 MW. What is its dependable capacity?", choices: ["52.0 MW", "50.0 MW", "54.0 MW", "55.0 MW"], correctAnswer: "52.0 MW" },
+            { question: "The Agus VII Hydroelectric Plant has an installed capacity of 54.0 MW. What is its dependable capacity?", choices: ["53.0 MW", "50.0 MW", "52.0 MW", "54.0 MW"], correctAnswer: "53.0 MW" },
+            { question: "The Tudaya 2 run-of-river hydro plant has an installed capacity of 8.1 MW. What is its dependable capacity?", choices: ["7.9 MW", "7.8 MW", "8.0 MW", "8.1 MW"], correctAnswer: "7.9 MW" },
+            { question: "The Bubunawan run-of-river hydro plant has an installed capacity of 6.6 MW. What is its dependable capacity?", choices: ["6.4 MW", "6.2 MW", "6.5 MW", "6.6 MW"], correctAnswer: "6.4 MW" },
+            { question: "The Cabulig HEP run-of-river plant has an installed capacity of 9.2 MW. What is its dependable capacity?", choices: ["8.5 MW", "8.1 MW", "8.3 MW", "8.7 MW"], correctAnswer: "8.5 MW" },
+            { question: "The Talomo 2A mini hydro plant in Davao City has what specific installed capacity?", choices: ["0.6 MW", "0.5 MW", "0.7 MW", "0.8 MW"], correctAnswer: "0.6 MW" },
+            { question: "The Jasaan BESS in Misamis Oriental has an installed capacity of 22.8 MW. What is its dependable capacity?", choices: ["20.0 MW", "18.0 MW", "22.0 MW", "22.8 MW"], correctAnswer: "20.0 MW" },
+            { question: "The Villanueva BESS in Misamis Oriental has an installed capacity of 22.8 MW. What is its dependable capacity?", choices: ["20.0 MW", "18.0 MW", "22.0 MW", "22.8 MW"], correctAnswer: "20.0 MW" }
+        ];
+
+        // --- Game State & Logic ---
+        let currentQuestionIndex = 0, score = 0, wrongAnswers = 0, timer, timeLeft, currentQuizQuestions = [], distractionInterval, currentStreak = 0;
+        const quizLength = 10;
+        let lifelinesUsed = {};
+
+        // --- Achievements State & Definitions (simulated persistence) ---
+        let playerStats = { gamesPlayed: 0, perfectScores: 0, bestStreak: 0 };
+        const achievements = {
+            rookie: { name: 'Rookie', desc: 'Play your first game', unlocked: false, condition: () => playerStats.gamesPlayed >= 1 },
+            perfecto: { name: 'Perfecto', desc: 'Get a perfect score', unlocked: false, condition: () => (score === quizLength && wrongAnswers === 0) },
+            onFire: { name: 'On Fire', desc: 'Answer 5 questions in a row correctly', unlocked: false, condition: () => playerStats.bestStreak >= 5 },
+            veteran: { name: 'Quiz Veteran', desc: 'Play 5 games', unlocked: false, condition: () => playerStats.gamesPlayed >= 5 }
+        };
+
+        function shuffleArray(array) { for (let i = array.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [array[i], array[j]] = [array[j], array[i]]; } }
+        function showScreen(screenToShow) { startScreen.classList.add('hidden'); quizScreen.classList.add('hidden'); resultsScreen.classList.add('hidden'); screenToShow.classList.remove('hidden'); screenToShow.classList.add('fade-in'); }
+        function startDistractions() { distractionInterval = setInterval(() => { if (Math.random() > 0.7) playRandomSound(); if (Math.random() > 0.8) createDinosaur(); }, 1000); }
+        function stopDistractions() { clearInterval(distractionInterval); distractionContainer.innerHTML = ''; }
+        
+        function startGame() {
+            playStartSound();
+            score = 0;
+            wrongAnswers = 0;
+            currentQuestionIndex = 0;
+            currentStreak = 0;
+            lifelinesUsed = { fiftyFifty: false, time: false, skip: false };
+            updateLifelineButtons();
+
+            const shuffledFullData = [...fullQuizData];
+            shuffleArray(shuffledFullData);
+            currentQuizQuestions = shuffledFullData.slice(0, quizLength);
+            
+            totalQuestionsEl.textContent = quizLength;
+            showScreen(quizScreen);
+            showQuestion();
+            startDistractions();
+        }
+
+        function showQuestion() {
+            resetTimer();
+            const currentQuestion = currentQuizQuestions[currentQuestionIndex];
+            
+            questionNumberEl.textContent = currentQuestionIndex + 1;
+            questionTextEl.textContent = currentQuestion.question;
+
+            choicesContainerEl.innerHTML = '';
+            const shuffledChoices = [...currentQuestion.choices];
+            shuffleArray(shuffledChoices);
+
+            shuffledChoices.forEach(choice => {
+                const button = document.createElement('button');
+                button.textContent = choice;
+                button.classList.add('choice-btn', 'w-full', 'p-4', 'text-left', 'rounded-lg', 'font-medium');
+                button.onclick = () => selectAnswer(choice);
+                choicesContainerEl.appendChild(button);
+            });
+
+            startTimer();
+        }
+
+        function selectAnswer(selectedChoice) {
+            clearInterval(timer);
+
+            if (selectedChoice === null) { // Timeout
+                wrongAnswers++;
+                currentStreak = 0;
+            } else {
+                const correct = selectedChoice === currentQuizQuestions[currentQuestionIndex].correctAnswer;
+                if (correct) {
+                    score++;
+                    currentStreak++;
+                    if (currentStreak > playerStats.bestStreak) {
+                        playerStats.bestStreak = currentStreak;
+                    }
+                } else {
+                    wrongAnswers++;
+                    currentStreak = 0;
+                }
+            }
+            nextQuestion();
+        }
+
+        function nextQuestion() {
+            currentQuestionIndex++;
+            if (currentQuestionIndex < currentQuizQuestions.length) {
+                showQuestion();
+            } else {
+                showResults();
+            }
+        }
+
+        function startTimer(extraTime = 0) {
+            if (extraTime === 0) {
+                timeLeft = Math.floor(Math.random() * 3) + 8; 
+            } else {
+                timeLeft += extraTime;
+            }
+            
+            const duration = timeLeft;
+            timerDisplayEl.textContent = timeLeft;
+            timerBarEl.style.width = '100%';
+            timerBarEl.style.transition = 'none';
+            
+            void timerBarEl.offsetWidth; 
+
+            timerBarEl.style.transition = `width ${duration}s linear`;
+            timerBarEl.style.width = '0%';
+
+            timer = setInterval(() => {
+                timeLeft--;
+                timerDisplayEl.textContent = timeLeft;
+                if (timeLeft <= 0) {
+                    clearInterval(timer);
+                    selectAnswer(null); // Treat timeout as a wrong answer
+                }
+            }, 1000);
+        }
+
+        function resetTimer() { clearInterval(timer); }
+
+        function showResults() {
+            stopDistractions();
+            playerStats.gamesPlayed++;
+            
+            const finalScore = score - wrongAnswers;
+            const newlyUnlocked = checkAchievements();
+
+            showScreen(resultsScreen);
+
+            scoreTextEl.textContent = finalScore;
+            scoreBreakdownEl.textContent = `(Correct: ${score} - Wrong: ${wrongAnswers})`;
+
+            let rating = '';
+            if (finalScore === 10) rating = 'Homo sapiens - A truly evolved intellect!';
+            else if (finalScore >= 7) rating = 'Homo erectus - You\'re standing tall!';
+            else if (finalScore >= 3) rating = 'Homo habilis - Handy with the facts!';
+            else if (finalScore >= 0) rating = 'Australopithecus - Getting the hang of it!';
+            else rating = 'Proconsul - Back to the trees with you!';
+            ratingTextEl.textContent = rating;
+
+            displayAchievements(newlyUnlocked);
+        }
+
+        function checkAchievements() {
+            const unlocked = [];
+            for (const key in achievements) {
+                const ach = achievements[key];
+                if (!ach.unlocked && ach.condition()) {
+                    ach.unlocked = true;
+                    unlocked.push(ach);
+                }
+            }
+            return unlocked;
+        }
+
+        function displayAchievements(unlocked) {
+            achievementsUnlockedEl.innerHTML = '';
+            if (unlocked.length > 0) {
+                const title = document.createElement('h3');
+                title.className = 'text-lg font-semibold text-amber-300 mb-2';
+                title.textContent = 'Achievements Unlocked!';
+                achievementsUnlockedEl.appendChild(title);
+
+                const badgeContainer = document.createElement('div');
+                badgeContainer.className = 'flex flex-wrap justify-center gap-2';
+                unlocked.forEach(ach => {
+                    const badge = document.createElement('div');
+                    badge.className = 'achievement-badge';
+                    badge.innerHTML = `<span>🏆</span> <span>${ach.name}</span>`;
+                    badgeContainer.appendChild(badge);
+                });
+                achievementsUnlockedEl.appendChild(badgeContainer);
+            }
+        }
+
+        function updateLifelineButtons() {
+            lifeline5050Btn.disabled = lifelinesUsed.fiftyFifty;
+            lifelineTimeBtn.disabled = lifelinesUsed.time;
+            lifelineSkipBtn.disabled = lifelinesUsed.skip;
+        }
+
+        // --- Lifeline Functions ---
+        function useFiftyFifty() {
+            if (lifelinesUsed.fiftyFifty) return;
+            lifelinesUsed.fiftyFifty = true;
+            updateLifelineButtons();
+
+            const currentQ = currentQuizQuestions[currentQuestionIndex];
+            const correctAnswer = currentQ.correctAnswer;
+            const incorrectAnswers = currentQ.choices.filter(c => c !== correctAnswer);
+            shuffleArray(incorrectAnswers);
+            const toRemove = incorrectAnswers.slice(0, 2);
+            
+            document.querySelectorAll('.choice-btn').forEach(btn => {
+                if (toRemove.includes(btn.textContent)) {
+                    btn.disabled = true;
+                }
+            });
+        }
+
+        function useAddTime() {
+            if (lifelinesUsed.time) return;
+            lifelinesUsed.time = true;
+            updateLifelineButtons();
+            
+            clearInterval(timer);
+            startTimer(3); 
+        }
+
+        function useSkip() {
+            if (lifelinesUsed.skip) return;
+            lifelinesUsed.skip = true;
+            updateLifelineButtons();
+
+            clearInterval(timer);
+            nextQuestion();
+        }
+        
+        // --- Event Listeners ---
+        startBtn.addEventListener('click', startGame);
+        playAgainBtn.addEventListener('click', () => showScreen(startScreen));
+        lifeline5050Btn.addEventListener('click', useFiftyFifty);
+        lifelineTimeBtn.addEventListener('click', useAddTime);
+        lifelineSkipBtn.addEventListener('click', useSkip);
+
+    </script>
+</body>
+</html>
